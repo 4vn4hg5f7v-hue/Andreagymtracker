@@ -16,6 +16,7 @@
     --green: #4ade80;
     --yellow: #fbbf24;
     --red: #f87171;
+    --volley: #f97316;
     --text: #e8e8f0;
     --muted: #7878a0;
     --radius: 12px;
@@ -30,8 +31,9 @@
 
   /* Tabs */
   .tabs { display: flex; gap: 6px; margin-bottom: 28px; background: var(--surface); padding: 5px; border-radius: var(--radius); }
-  .tab { flex: 1; padding: 9px 6px; text-align: center; border-radius: 9px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); border: none; background: none; transition: all .15s; }
+  .tab { flex: 1; padding: 9px 4px; text-align: center; border-radius: 9px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); border: none; background: none; transition: all .15s; }
   .tab.active { background: var(--accent); color: #fff; }
+  .tab.active.volley-tab { background: var(--volley); }
   .tab:hover:not(.active) { color: var(--text); }
   .page { display: none; }
   .page.active { display: block; }
@@ -152,10 +154,30 @@
   .btn-import:hover { border-color: var(--accent); color: var(--accent); }
   input[type="file"]#import-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 
+  /* ═══ VOLLEYBALL STYLES ═══ */
+  .type-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 4px; }
+  .type-btn { padding: 12px 8px; border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; text-align: center; font-size: 13px; font-weight: 600; color: var(--muted); background: none; transition: all .15s; }
+  .type-btn:hover { border-color: var(--volley); }
+  .type-btn.selected { border-color: var(--volley); background: #f9731620; color: var(--volley); }
+
+  .rating-bar { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rating-btn { flex: 1; min-width: 26px; padding: 7px 2px; text-align: center; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); background: none; transition: all .15s; }
+  .rating-btn:hover { border-color: var(--volley); color: var(--volley); }
+  .rating-btn.sel { border-color: var(--volley); background: #f9731622; color: var(--volley); }
+
+  .skill-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .skill-item label { font-size: 13px; font-weight: 600; margin-bottom: 8px; display: block; }
+
+  .volley-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; cursor: pointer; transition: border-color .15s; }
+  .volley-item:hover { border-color: var(--volley); }
+  .volley-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: #f9731622; color: var(--volley); }
+  .rating-dot { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: #f9731622; color: var(--volley); font-weight: 700; font-size: 14px; }
+
   @media (max-width: 480px) {
     .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .stat-val { font-size: 22px; }
     .day-grid { grid-template-columns: 1fr; }
+    .skill-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -167,6 +189,7 @@
   <div class="tabs">
     <button class="tab active" onclick="switchTab('log')">Registra</button>
     <button class="tab" onclick="switchTab('history')">Storico</button>
+    <button class="tab volley-tab" onclick="switchTab('volley')">🏐 Volley</button>
     <button class="tab" onclick="switchTab('progress')">Progressi</button>
   </div>
 
@@ -258,8 +281,90 @@
     <div id="history-list"></div>
   </div>
 
+  <!-- ═══════════════════════════════════ VOLLEYBALL PAGE ═══════════════════════════════════ -->
+  <div id="page-volley" class="page">
+
+    <!-- Tipo sessione -->
+    <div class="card">
+      <div class="card-title">Tipo di sessione</div>
+      <div class="type-grid">
+        <button class="type-btn selected" data-type="allenamento" onclick="selectVolleyType('allenamento')">🏋️ Allenamento tecnico</button>
+        <button class="type-btn" data-type="partita" onclick="selectVolleyType('partita')">🏆 Partita</button>
+        <button class="type-btn" data-type="fisico" onclick="selectVolleyType('fisico')">💪 Atletico</button>
+        <button class="type-btn" data-type="libero" onclick="selectVolleyType('libero')">🌀 Gioco libero</button>
+      </div>
+    </div>
+
+    <!-- Data e durata -->
+    <div class="card">
+      <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <label style="font-size:13px;color:var(--muted);white-space:nowrap;">Data:</label>
+          <input type="date" id="volley-date" style="width:auto;" />
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <label style="font-size:13px;color:var(--muted);white-space:nowrap;">Durata (min):</label>
+          <input type="number" id="volley-duration" placeholder="es. 90" min="0" style="width:100px;" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Voto sessione -->
+    <div class="card">
+      <div class="card-title">Voto sessione (1–10)</div>
+      <div class="rating-bar" id="volley-rating-bar"></div>
+    </div>
+
+    <!-- Skill ratings -->
+    <div class="card">
+      <div class="card-title">Valutazione skill</div>
+      <div class="skill-grid">
+        <div class="skill-item">
+          <label>🏐 Servizio</label>
+          <div class="rating-bar" id="skill-servizio"></div>
+        </div>
+        <div class="skill-item">
+          <label>🤲 Ricezione</label>
+          <div class="rating-bar" id="skill-ricezione"></div>
+        </div>
+        <div class="skill-item">
+          <label>⚡ Attacco</label>
+          <div class="rating-bar" id="skill-attacco"></div>
+        </div>
+        <div class="skill-item">
+          <label>🛡️ Difesa</label>
+          <div class="rating-bar" id="skill-difesa"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Impressioni -->
+    <div class="card">
+      <div class="card-title">Impressioni</div>
+      <textarea id="volley-notes" class="notes-area" placeholder="Come è andata? Cosa ha funzionato, cosa migliorare, sensazioni fisiche..."></textarea>
+    </div>
+
+    <button class="btn-primary" style="background:var(--volley);" onclick="saveVolleySession()">Salva sessione pallavolo</button>
+
+    <!-- Storico pallavolo inline -->
+    <div style="margin-top:32px;">
+      <div class="card-title" style="margin-bottom:12px;">Sessioni recenti</div>
+      <div id="volley-history-list"></div>
+    </div>
+  </div>
+
   <!-- ═══════════════════════════════════ PROGRESS PAGE ═══════════════════════════════════ -->
   <div id="page-progress" class="page">
+
+    <!-- Confronto palestra / pallavolo -->
+    <div class="card">
+      <div class="card-title">Confronto palestra vs pallavolo</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">RPE medio palestra · Voto sessione pallavolo — stessa scala 1–10</div>
+      <div class="chart-wrap">
+        <canvas id="comparison-chart"></canvas>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title">Progressione esercizio</div>
       <div class="chart-controls">
@@ -357,6 +462,13 @@ const DAYS = {
 const KNEE_LABELS = ["Ok ✅", "Leggero ⚠️", "Fastidio 😬", "Dolore 🛑"];
 const KNEE_COLORS = ["#4ade80", "#fbbf24", "#ff6584", "#f87171"];
 
+const VOLLEY_TYPES = {
+  allenamento: "🏋️ Allenamento tecnico",
+  partita:     "🏆 Partita",
+  fisico:      "💪 Atletico",
+  libero:      "🌀 Gioco libero"
+};
+
 // ═══════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════
@@ -368,27 +480,43 @@ function loadSessions() {
   try {
     return JSON.parse(localStorage.getItem('workout_sessions') || '[]');
   } catch (err) {
-    // localStorage bloccato (file:// o navigazione privata su iOS) o dati corrotti
     storageOK = false;
     return [];
   }
 }
 
+function loadVolleySessions() {
+  try {
+    return JSON.parse(localStorage.getItem('volley_sessions') || '[]');
+  } catch (err) {
+    return [];
+  }
+}
+
 let sessions = loadSessions();
-let progChart = null, kneeChart = null;
+let volleySessions = loadVolleySessions();
+let progChart = null, kneeChart = null, compChart = null;
+
+// Volleyball form state
+let volleyState = {
+  type: 'allenamento',
+  rating: 0,
+  skills: { servizio: 0, ricezione: 0, attacco: 0, difesa: 0 }
+};
 
 // ═══════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('session-date').value = today();
+  document.getElementById('volley-date').value = today();
   renderExercises();
   populateExerciseSelect();
   checkStorage();
+  initVolleyForm();
 });
 
 function checkStorage() {
-  // Verifica reale: prova a scrivere e rileggere una chiave di test
   try {
     localStorage.setItem('__test__', '1');
     localStorage.removeItem('__test__');
@@ -417,7 +545,8 @@ function switchTab(name) {
   document.querySelector(`[onclick="switchTab('${name}')"]`).classList.add('active');
   document.getElementById(`page-${name}`).classList.add('active');
   if (name === 'history') renderHistory();
-  if (name === 'progress') { populateExerciseSelect(); renderProgressChart(); renderKneeChart(); renderPRTable(); }
+  if (name === 'progress') { populateExerciseSelect(); renderProgressChart(); renderKneeChart(); renderPRTable(); renderComparisonChart(); }
+  if (name === 'volley') renderVolleyHistory();
 }
 
 // ═══════════════════════════════════════════════════
@@ -499,7 +628,6 @@ function addSet(exId) {
 function removeSet(btn) {
   const row = btn.closest('[data-set]');
   row.remove();
-  // Renumber
   const grid = row.closest('.sets-grid');
   grid.querySelectorAll('[data-set]').forEach((r, i) => {
     r.dataset.set = i + 1;
@@ -508,7 +636,7 @@ function removeSet(btn) {
 }
 
 // ═══════════════════════════════════════════════════
-// SAVE SESSION
+// SAVE SESSION (gym)
 // ═══════════════════════════════════════════════════
 function saveSession() {
   const date = document.getElementById('session-date').value;
@@ -548,7 +676,6 @@ function saveSession() {
   saveSessions();
   showToast('Sessione salvata! 💪');
 
-  // Reset form
   document.getElementById('session-notes').value = '';
   renderExercises();
   selectKnee(0);
@@ -559,19 +686,171 @@ function saveSessions() {
     localStorage.setItem('workout_sessions', JSON.stringify(sessions));
     storageOK = true;
   } catch (err) {
-    // Il salvataggio è fallito: NON fallire in silenzio, avvisa Andrea
     storageOK = false;
     showToast('⚠️ Salvataggio non riuscito! Usa Esporta per non perdere i dati', true);
   }
 }
 
 // ═══════════════════════════════════════════════════
-// HISTORY
+// VOLLEYBALL LOGIC
+// ═══════════════════════════════════════════════════
+function initVolleyForm() {
+  buildRatingBar('volley-rating-bar', 'rating');
+  buildRatingBar('skill-servizio', 'servizio');
+  buildRatingBar('skill-ricezione', 'ricezione');
+  buildRatingBar('skill-attacco', 'attacco');
+  buildRatingBar('skill-difesa', 'difesa');
+}
+
+function buildRatingBar(containerId, key) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  const isSkill = key !== 'rating';
+  const current = isSkill ? volleyState.skills[key] : volleyState.rating;
+  for (let i = 1; i <= 10; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'rating-btn' + (i === current ? ' sel' : '');
+    btn.textContent = i;
+    btn.onclick = () => {
+      if (isSkill) volleyState.skills[key] = i;
+      else volleyState.rating = i;
+      buildRatingBar(containerId, key);
+    };
+    container.appendChild(btn);
+  }
+}
+
+function selectVolleyType(type) {
+  volleyState.type = type;
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector(`[data-type="${type}"]`).classList.add('selected');
+}
+
+function saveVolleySession() {
+  const date = document.getElementById('volley-date').value;
+  if (!date) { showToast('Inserisci la data!', true); return; }
+  if (volleyState.rating === 0) { showToast('Dai un voto alla sessione!', true); return; }
+
+  const duration = parseInt(document.getElementById('volley-duration').value) || null;
+
+  const session = {
+    id: Date.now(),
+    date,
+    type: volleyState.type,
+    duration,
+    rating: volleyState.rating,
+    skills: { ...volleyState.skills },
+    notes: document.getElementById('volley-notes').value.trim()
+  };
+
+  volleySessions.push(session);
+  volleySessions.sort((a, b) => a.date.localeCompare(b.date));
+
+  try {
+    localStorage.setItem('volley_sessions', JSON.stringify(volleySessions));
+  } catch (err) {
+    showToast('⚠️ Salvataggio non riuscito!', true);
+    return;
+  }
+
+  showToast('Sessione pallavolo salvata! 🏐');
+
+  // Reset
+  volleyState = { type: 'allenamento', rating: 0, skills: { servizio: 0, ricezione: 0, attacco: 0, difesa: 0 } };
+  document.getElementById('volley-notes').value = '';
+  document.getElementById('volley-date').value = today();
+  document.getElementById('volley-duration').value = '';
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector('[data-type="allenamento"]').classList.add('selected');
+  initVolleyForm();
+  renderVolleyHistory();
+}
+
+function renderVolleyHistory() {
+  const list = document.getElementById('volley-history-list');
+  if (volleySessions.length === 0) {
+    list.innerHTML = '<div class="no-data">Nessuna sessione ancora.<br>Registra il tuo primo allenamento di pallavolo!</div>';
+    return;
+  }
+  const sorted = [...volleySessions].sort((a, b) => b.date.localeCompare(a.date));
+  list.innerHTML = sorted.map(s => {
+    const skillEntries = Object.entries(s.skills).filter(([, v]) => v > 0);
+    const skillPills = skillEntries.map(([k, v]) => {
+      const icons = { servizio: '🏐', ricezione: '🤲', attacco: '⚡', difesa: '🛡️' };
+      return `<span class="meta-pill">${icons[k]} ${k.charAt(0).toUpperCase() + k.slice(1)}: <strong>${v}</strong></span>`;
+    }).join('');
+    return `<div class="volley-item" onclick="openVolleySession(${s.id})">
+      <div class="session-header">
+        <div>
+          <div class="session-day">${VOLLEY_TYPES[s.type]}</div>
+          <div class="session-date">${formatDate(s.date)}${s.duration ? ` · ${s.duration} min` : ''}</div>
+        </div>
+        <div class="rating-dot">${s.rating}</div>
+      </div>
+      ${skillPills ? `<div class="session-meta" style="margin-top:10px;">${skillPills}</div>` : ''}
+      ${s.notes ? `<div style="margin-top:8px;font-size:12px;color:var(--muted);line-height:1.4;">"${s.notes.slice(0, 100)}${s.notes.length > 100 ? '…' : ''}"</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function openVolleySession(id) {
+  const s = volleySessions.find(s => s.id === id);
+  if (!s) return;
+
+  const skillRows = Object.entries(s.skills)
+    .filter(([, v]) => v > 0)
+    .map(([k, v]) => {
+      const icons = { servizio: '🏐', ricezione: '🤲', attacco: '⚡', difesa: '🛡️' };
+      const bar = Array.from({ length: 10 }, (_, i) =>
+        `<span style="display:inline-block;width:16px;height:8px;border-radius:3px;margin-right:2px;background:${i < v ? '#f97316' : '#2e2e3d'}"></span>`
+      ).join('');
+      return `<tr>
+        <td>${icons[k]} ${k.charAt(0).toUpperCase() + k.slice(1)}</td>
+        <td><strong>${v}/10</strong></td>
+        <td>${bar}</td>
+      </tr>`;
+    }).join('');
+
+  document.getElementById('modal-content').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+      <div>
+        <div class="modal-title">${VOLLEY_TYPES[s.type]}</div>
+        <div class="modal-sub">${formatDate(s.date)}${s.duration ? ` · ${s.duration} min` : ''}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-danger" onclick="deleteVolleySession(${s.id})">Elimina</button>
+        <button class="btn-secondary" onclick="closeModal()">✕</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:16px;background:var(--surface2);border-radius:var(--radius);">
+      <div style="font-size:36px;font-weight:800;color:var(--volley);">${s.rating}</div>
+      <div style="font-size:13px;color:var(--muted);">Voto sessione</div>
+    </div>
+    ${skillRows ? `<table class="modal-table" style="margin-bottom:16px;">
+      <tr><th>Skill</th><th>Voto</th><th>Barra</th></tr>
+      ${skillRows}
+    </table>` : ''}
+    ${s.notes ? `<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--muted);line-height:1.5;">📝 ${s.notes}</div>` : ''}
+  `;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function deleteVolleySession(id) {
+  if (!confirm('Eliminare questa sessione?')) return;
+  volleySessions = volleySessions.filter(s => s.id !== id);
+  try { localStorage.setItem('volley_sessions', JSON.stringify(volleySessions)); } catch (e) {}
+  document.getElementById('modal-overlay').classList.remove('open');
+  renderVolleyHistory();
+  showToast('Sessione eliminata');
+}
+
+// ═══════════════════════════════════════════════════
+// HISTORY (gym)
 // ═══════════════════════════════════════════════════
 function renderHistory() {
   const list = document.getElementById('history-list');
 
-  // Stats
   const now = new Date();
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay());
@@ -635,7 +914,7 @@ function getMonday(d) {
 }
 
 // ═══════════════════════════════════════════════════
-// SESSION MODAL
+// SESSION MODAL (gym)
 // ═══════════════════════════════════════════════════
 function openSession(id) {
   const s = sessions.find(s => s.id === id);
@@ -690,7 +969,98 @@ function deleteSession(id) {
 }
 
 // ═══════════════════════════════════════════════════
-// PROGRESS CHARTS
+// COMPARISON CHART (palestra vs pallavolo)
+// ═══════════════════════════════════════════════════
+function renderComparisonChart() {
+  const ctx = document.getElementById('comparison-chart').getContext('2d');
+  if (compChart) { compChart.destroy(); compChart = null; }
+
+  // Build gym data: avg RPE per session
+  const gymMap = {};
+  sessions.forEach(s => {
+    const rpes = s.exercises.flatMap(ex => ex.sets.map(set => set.rpe).filter(r => r != null));
+    if (rpes.length > 0) {
+      const avg = rpes.reduce((a, b) => a + b, 0) / rpes.length;
+      gymMap[s.date] = parseFloat(avg.toFixed(1));
+    }
+  });
+
+  // Build volley data: rating per session
+  const volleyMap = {};
+  volleySessions.forEach(s => { volleyMap[s.date] = s.rating; });
+
+  const allDates = [...new Set([...Object.keys(gymMap), ...Object.keys(volleyMap)])].sort();
+
+  if (allDates.length === 0) {
+    ctx.clearRect(0, 0, 800, 240);
+    ctx.fillStyle = '#7878a0';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Aggiungi sessioni di palestra e pallavolo per vedere il confronto.', 400, 120);
+    return;
+  }
+
+  const gymData = allDates.map(d => gymMap[d] ?? null);
+  const volleyData = allDates.map(d => volleyMap[d] ?? null);
+  const labels = allDates.map(d => formatDateShort(d));
+
+  compChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '💪 Palestra (RPE medio)',
+          data: gymData,
+          borderColor: '#6c63ff',
+          backgroundColor: '#6c63ff22',
+          pointBackgroundColor: '#6c63ff',
+          pointRadius: gymData.map(v => v != null ? 5 : 0),
+          spanGaps: false,
+          tension: 0.3,
+          fill: false,
+        },
+        {
+          label: '🏐 Pallavolo (voto)',
+          data: volleyData,
+          borderColor: '#f97316',
+          backgroundColor: '#f9731622',
+          pointBackgroundColor: '#f97316',
+          pointRadius: volleyData.map(v => v != null ? 5 : 0),
+          spanGaps: false,
+          tension: 0.3,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: '#e8e8f0', font: { size: 12 }, boxWidth: 12 }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.raw ?? '—'}`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: '#2e2e3d' }, ticks: { color: '#7878a0' } },
+        y: {
+          min: 1, max: 10,
+          grid: { color: '#2e2e3d' },
+          ticks: { color: '#7878a0', stepSize: 1 }
+        }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// PROGRESS CHARTS (gym)
 // ═══════════════════════════════════════════════════
 function populateExerciseSelect() {
   const sel = document.getElementById('prog-exercise');
@@ -698,7 +1068,6 @@ function populateExerciseSelect() {
   const exerciseSet = new Map();
   sessions.forEach(s => s.exercises.forEach(ex => exerciseSet.set(ex.id, ex.name)));
 
-  // Add all exercises from plan if not yet logged
   Object.values(DAYS).forEach(d => d.exercises.forEach(ex => {
     if (!exerciseSet.has(ex.id)) exerciseSet.set(ex.id, ex.name);
   }));
@@ -824,7 +1193,6 @@ function renderPRTable() {
   }
 
   const rows = Object.values(prs).sort((a, b) => a.name.localeCompare(b.name)).map(pr => {
-    // Check trend: compare last 2 sessions for this exercise
     const exSessions = sessions.filter(s => s.exercises.some(e => e.name === pr.name));
     let trend = '—';
     if (exSessions.length >= 2) {
@@ -856,14 +1224,11 @@ function maxKg(session, exName) {
 }
 
 // ═══════════════════════════════════════════════════
-// UTILS
-// ═══════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════
 // EXPORT / IMPORT
 // ═══════════════════════════════════════════════════
 function exportData() {
-  if (sessions.length === 0) { showToast('Nessuna sessione da esportare!', true); return; }
-  const payload = JSON.stringify({ version: 1, exported: new Date().toISOString(), sessions }, null, 2);
+  if (sessions.length === 0 && volleySessions.length === 0) { showToast('Nessuna sessione da esportare!', true); return; }
+  const payload = JSON.stringify({ version: 2, exported: new Date().toISOString(), sessions, volleySessions }, null, 2);
   const blob = new Blob([payload], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -872,7 +1237,7 @@ function exportData() {
   a.download = `allenamento_${dateStr}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast(`Esportate ${sessions.length} sessioni ✓`);
+  showToast(`Esportate ${sessions.length + volleySessions.length} sessioni ✓`);
 }
 
 function importData(event) {
@@ -883,16 +1248,25 @@ function importData(event) {
     try {
       const data = JSON.parse(e.target.result);
       if (!data.sessions || !Array.isArray(data.sessions)) throw new Error('Formato non valido');
-      const incoming = data.sessions;
-      // Merge: aggiungi solo sessioni con ID non già presenti
+
       const existingIds = new Set(sessions.map(s => s.id));
-      const newOnes = incoming.filter(s => !existingIds.has(s.id));
-      const duplicates = incoming.length - newOnes.length;
-      sessions = [...sessions, ...newOnes].sort((a, b) => a.date.localeCompare(b.date));
+      const newGym = data.sessions.filter(s => !existingIds.has(s.id));
+      sessions = [...sessions, ...newGym].sort((a, b) => a.date.localeCompare(b.date));
       saveSessions();
+
+      let newVolley = 0;
+      if (data.volleySessions && Array.isArray(data.volleySessions)) {
+        const existingVolleyIds = new Set(volleySessions.map(s => s.id));
+        const newV = data.volleySessions.filter(s => !existingVolleyIds.has(s.id));
+        volleySessions = [...volleySessions, ...newV].sort((a, b) => a.date.localeCompare(b.date));
+        try { localStorage.setItem('volley_sessions', JSON.stringify(volleySessions)); } catch (err) {}
+        newVolley = newV.length;
+      }
+
       renderHistory();
-      let msg = `Importate ${newOnes.length} sessioni ✓`;
-      if (duplicates > 0) msg += ` (${duplicates} già presenti, saltate)`;
+      let msg = `Importate ${newGym.length} sessioni palestra`;
+      if (newVolley > 0) msg += ` + ${newVolley} pallavolo`;
+      msg += ' ✓';
       showToast(msg);
     } catch (err) {
       showToast('File non valido!', true);
@@ -902,8 +1276,10 @@ function importData(event) {
   reader.readAsText(file);
 }
 
+// ═══════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════
 function estimate1RM(kg, reps, rpe) {
-  // Epley formula adjusted for RPE: effective reps = reps + (10 - rpe)
   const effectiveReps = reps + (10 - rpe);
   return kg * (1 + effectiveReps / 30);
 }
