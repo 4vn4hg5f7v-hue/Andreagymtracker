@@ -265,10 +265,31 @@
         <div class="stat-lbl">Streak (sett.)</div>
       </div>
     </div>
-    <!-- Sync -->
+    <!-- Cloud sync -->
     <div class="sync-box">
-      <div class="sync-title">📲 Sincronizza tra dispositivi</div>
-      <div class="sync-desc">Esporta i tuoi dati su Mac e importali sul telefono (o viceversa). Il file JSON contiene tutte le sessioni.</div>
+      <div class="sync-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>☁️ Sync automatico cloud</span>
+        <span id="sync-badge" style="font-size:11px;font-weight:700;">○ Non configurato</span>
+      </div>
+      <div class="sync-desc">Inserisci l'indirizzo del Worker e la password una volta sola: i dati si sincronizzano da soli tra Mac e telefono a ogni apertura e salvataggio.</div>
+      <div style="display:grid;gap:8px;margin-bottom:12px;">
+        <input type="text" id="sync-url" placeholder="https://andrea-sync.xxxxx.workers.dev" />
+        <div style="display:flex;gap:8px;">
+          <input type="password" id="sync-pw" placeholder="password sync" style="flex:1;" />
+          <input type="text" id="sync-key" placeholder="chiave" value="andrea" style="width:120px;" />
+        </div>
+      </div>
+      <div class="sync-btns">
+        <button class="btn-export" onclick="saveSyncConfig()">💾 Salva e attiva</button>
+        <button class="btn-import" style="flex:1;" onclick="syncNow()">🔄 Sincronizza ora</button>
+      </div>
+      <div id="sync-status" style="font-size:12px;color:var(--muted);margin-top:10px;min-height:16px;"></div>
+    </div>
+
+    <!-- Sync manuale (backup) -->
+    <div class="sync-box">
+      <div class="sync-title">📲 Backup manuale (export/import)</div>
+      <div class="sync-desc">In alternativa al cloud: esporta i dati in un file e reimportali sull'altro dispositivo.</div>
       <div class="sync-btns">
         <button class="btn-export" onclick="exportData()">⬇ Esporta dati</button>
         <div class="btn-import-wrap">
@@ -505,6 +526,128 @@ let volleyState = {
 };
 
 // ═══════════════════════════════════════════════════
+// SYNC CLOUD (Cloudflare Worker + KV)
+// ═══════════════════════════════════════════════════
+function syncCfg() {
+  try { return JSON.parse(localStorage.getItem('sync_cfg') || '{}'); } catch (e) { return {}; }
+}
+function saveSyncCfg(c) { localStorage.setItem('sync_cfg', JSON.stringify(c)); }
+function syncEnabled() { const c = syncCfg(); return !!(c.url && c.pw); }
+
+let tombstones = (() => {
+  try { return JSON.parse(localStorage.getItem('sync_deleted') || '{"gym":[],"volley":[]}'); }
+  catch (e) { return { gym: [], volley: [] }; }
+})();
+function saveTombstones() { localStorage.setItem('sync_deleted', JSON.stringify(tombstones)); }
+function recordTombstone(kind, id) {
+  if (!tombstones[kind].includes(id)) { tombstones[kind].push(id); saveTombstones(); }
+}
+
+function syncStatus(msg, kind) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const colors = { ok: 'var(--green)', err: 'var(--red)', busy: 'var(--muted)' };
+  el.textContent = msg;
+  el.style.color = colors[kind] || 'var(--muted)';
+}
+
+async function cloudPush() {
+  if (!syncEnabled()) return;
+  const c = syncCfg();
+  const payload = { sessions, volleySessions, deleted: tombstones, updated: new Date().toISOString() };
+  try {
+    syncStatus('Sincronizzo…', 'busy');
+    const r = await fetch(`${c.url}?key=${encodeURIComponent(c.key || 'andrea')}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Sync-Pw': c.pw },
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    syncStatus('✓ Sincronizzato ' + new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }), 'ok');
+  } catch (e) {
+    syncStatus('✗ Sync fallito (dati comunque salvati in locale)', 'err');
+  }
+}
+
+function mergeById(local, remote, delIds) {
+  const map = new Map();
+  [...(local || []), ...(remote || [])].forEach(x => { if (x && x.id != null) map.set(x.id, x); });
+  (delIds || []).forEach(id => map.delete(id));
+  return [...map.values()].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+}
+
+async function cloudPull(silent) {
+  if (!syncEnabled()) return false;
+  const c = syncCfg();
+  try {
+    if (!silent) syncStatus('Scarico dal cloud…', 'busy');
+    const r = await fetch(`${c.url}?key=${encodeURIComponent(c.key || 'andrea')}`, { headers: { 'X-Sync-Pw': c.pw } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const remote = await r.json();
+    const remDel = remote.deleted || { gym: [], volley: [] };
+    tombstones = {
+      gym:    [...new Set([...(tombstones.gym || []),    ...(remDel.gym || [])])],
+      volley: [...new Set([...(tombstones.volley || []), ...(remDel.volley || [])])]
+    };
+    saveTombstones();
+    sessions       = mergeById(sessions,       remote.sessions,       tombstones.gym);
+    volleySessions = mergeById(volleySessions, remote.volleySessions, tombstones.volley);
+    saveSessions();
+    try { localStorage.setItem('volley_sessions', JSON.stringify(volleySessions)); } catch (e) {}
+    refreshActivePage();
+    return true;
+  } catch (e) {
+    if (!silent) syncStatus('✗ Download fallito', 'err');
+    return false;
+  }
+}
+
+function refreshActivePage() {
+  const active = document.querySelector('.page.active');
+  if (!active) return;
+  if (active.id === 'page-history') renderHistory();
+  else if (active.id === 'page-volley') renderVolleyHistory();
+  else if (active.id === 'page-progress') { populateExerciseSelect(); renderProgressChart(); renderKneeChart(); renderPRTable(); renderComparisonChart(); }
+}
+
+async function syncInit() {
+  renderSyncUI();
+  if (!syncEnabled()) return;
+  const ok = await cloudPull();
+  if (ok) await cloudPush();
+}
+
+async function syncNow() {
+  if (!syncEnabled()) { showToast('Configura prima il sync cloud', true); return; }
+  const ok = await cloudPull();
+  if (ok) { await cloudPush(); showToast('Sincronizzato ✓'); }
+}
+
+function saveSyncConfig() {
+  const url = document.getElementById('sync-url').value.trim().replace(/\/+$/, '');
+  const pw = document.getElementById('sync-pw').value.trim();
+  const key = (document.getElementById('sync-key').value.trim() || 'andrea');
+  if (!url || !pw) { showToast('Inserisci indirizzo e password', true); return; }
+  saveSyncCfg({ url, pw, key });
+  showToast('Configurazione sync salvata ✓');
+  renderSyncUI();
+  syncNow();
+}
+
+const DEFAULT_SYNC_URL = 'https://andrea-sync.r5gfpz5g4f.workers.dev';
+function renderSyncUI() {
+  const c = syncCfg();
+  const u = document.getElementById('sync-url'); if (u) u.value = c.url || DEFAULT_SYNC_URL;
+  const p = document.getElementById('sync-pw'); if (p) p.value = c.pw || '';
+  const k = document.getElementById('sync-key'); if (k) k.value = c.key || 'andrea';
+  const badge = document.getElementById('sync-badge');
+  if (badge) {
+    badge.textContent = syncEnabled() ? '● Attivo' : '○ Non configurato';
+    badge.style.color = syncEnabled() ? 'var(--green)' : 'var(--muted)';
+  }
+}
+
+// ═══════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
@@ -514,6 +657,7 @@ document.addEventListener('DOMContentLoaded', () => {
   populateExerciseSelect();
   checkStorage();
   initVolleyForm();
+  syncInit();
 });
 
 function checkStorage() {
@@ -689,6 +833,7 @@ function saveSessions() {
     storageOK = false;
     showToast('⚠️ Salvataggio non riuscito! Usa Esporta per non perdere i dati', true);
   }
+  cloudPush();
 }
 
 // ═══════════════════════════════════════════════════
@@ -753,6 +898,7 @@ function saveVolleySession() {
     showToast('⚠️ Salvataggio non riuscito!', true);
     return;
   }
+  cloudPush();
 
   showToast('Sessione pallavolo salvata! 🏐');
 
@@ -838,8 +984,10 @@ function openVolleySession(id) {
 
 function deleteVolleySession(id) {
   if (!confirm('Eliminare questa sessione?')) return;
+  recordTombstone('volley', id);
   volleySessions = volleySessions.filter(s => s.id !== id);
   try { localStorage.setItem('volley_sessions', JSON.stringify(volleySessions)); } catch (e) {}
+  cloudPush();
   document.getElementById('modal-overlay').classList.remove('open');
   renderVolleyHistory();
   showToast('Sessione eliminata');
@@ -961,6 +1109,7 @@ function closeModal(e) {
 
 function deleteSession(id) {
   if (!confirm('Eliminare questa sessione?')) return;
+  recordTombstone('gym', id);
   sessions = sessions.filter(s => s.id !== id);
   saveSessions();
   document.getElementById('modal-overlay').classList.remove('open');
